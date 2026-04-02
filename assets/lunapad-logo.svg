@@ -1,0 +1,22 @@
+<svg width="960" height="320" viewBox="0 0 960 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="320" rx="36" fill="#08111F"/>
+  <rect x="36" y="36" width="888" height="248" rx="28" fill="url(#panel)"/>
+  <circle cx="168" cy="160" r="78" fill="#F4C95D"/>
+  <circle cx="196" cy="142" r="78" fill="#08111F"/>
+  <rect x="260" y="92" width="220" height="36" rx="18" fill="#122238"/>
+  <rect x="496" y="92" width="132" height="36" rx="18" fill="#163357"/>
+  <rect x="644" y="92" width="118" height="36" rx="18" fill="#122238"/>
+  <rect x="260" y="146" width="502" height="112" rx="20" fill="#0A1729" stroke="#21466E"/>
+  <rect x="286" y="172" width="128" height="24" rx="12" fill="#5BC0BE"/>
+  <rect x="430" y="172" width="164" height="24" rx="12" fill="#244361"/>
+  <rect x="286" y="210" width="202" height="16" rx="8" fill="#17304B"/>
+  <rect x="502" y="210" width="178" height="16" rx="8" fill="#17304B"/>
+  <text x="510" y="154" fill="#F8FAFC" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="68" font-weight="700" letter-spacing="-1.8">LunaPad</text>
+  <text x="512" y="198" fill="#9FB5CC" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="2.6">MOONLIT MACOS NOTES</text>
+  <defs>
+    <linearGradient id="panel" x1="80" y1="52" x2="888" y2="268" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D1B2A"/>
+      <stop offset="1" stop-color="#102640"/>
+    </linearGradient>
+  </defs>
+</svg>

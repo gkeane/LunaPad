@@ -1,0 +1,339 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		066CD2918C447DA0222550B5 /* NoteDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0327DB5D8BFE8B99FCD9B2E /* NoteDocument.swift */; };
+		19215E58DB4E3ABAD886C089 /* WorkspaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E45CA2444B71DD61C5A33A2 /* WorkspaceManager.swift */; };
+		24346C47C383ABC325DE1A79 /* LunaPadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A189EC07EACAE799956B41FC /* LunaPadApp.swift */; };
+		3183F711804C568F3585DE29 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39BE9960C2B7CB881FADFBAB /* MainView.swift */; };
+		3EB59E93DDA70424F6D57DEF /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBAF64E340F9E38DC8D3983 /* WorkspaceView.swift */; };
+		79746E13D1A5860CB23EDE3E /* NoteTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5A22818FBD15C166D263729 /* NoteTextEditor.swift */; };
+		97E3B9FB2A066D9494EDA5ED /* FindReplacePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A69DC5FA19C334A59D007F2 /* FindReplacePanel.swift */; };
+		A573B5D99CE6A6399F812148 /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CEEE1B573118F0D150E3EF7 /* StatusBarView.swift */; };
+		A7E801F2666853946B89E9DA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE386C29D07FB5FB660A532A /* ContentView.swift */; };
+		C7EB4EFF79F7D76CFB408AA0 /* FormatCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D9A310BABE91A3F4967BD91 /* FormatCommands.swift */; };
+		CD261A0FC0323644223F6936 /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC62DCA1FCB3A4785FEE36A6 /* TabManager.swift */; };
+		F535BBDF1A0D9751420FFF86 /* FindReplaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268AECA6C2D233999BFF8033 /* FindReplaceManager.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1CEEE1B573118F0D150E3EF7 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
+		268AECA6C2D233999BFF8033 /* FindReplaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindReplaceManager.swift; sourceTree = "<group>"; };
+		27FE3CF6C3D455CEB3F108EF /* LunaPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LunaPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39BE9960C2B7CB881FADFBAB /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		3E45CA2444B71DD61C5A33A2 /* WorkspaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManager.swift; sourceTree = "<group>"; };
+		5A69DC5FA19C334A59D007F2 /* FindReplacePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindReplacePanel.swift; sourceTree = "<group>"; };
+		6D9A310BABE91A3F4967BD91 /* FormatCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatCommands.swift; sourceTree = "<group>"; };
+		A189EC07EACAE799956B41FC /* LunaPadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LunaPadApp.swift; sourceTree = "<group>"; };
+		A5A22818FBD15C166D263729 /* NoteTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextEditor.swift; sourceTree = "<group>"; };
+		B0327DB5D8BFE8B99FCD9B2E /* NoteDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDocument.swift; sourceTree = "<group>"; };
+		BC62DCA1FCB3A4785FEE36A6 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
+		BCBAF64E340F9E38DC8D3983 /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
+		C29176D4EBDABAEA3F51072D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FE386C29D07FB5FB660A532A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		6CE3215C92E38A8C7F1393C4 = {
+			isa = PBXGroup;
+			children = (
+				C561B4926A05DE55796B3DB5 /* Sources */,
+				D1DE477B8E1266F0CA5C1ED3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C561B4926A05DE55796B3DB5 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				FE386C29D07FB5FB660A532A /* ContentView.swift */,
+				268AECA6C2D233999BFF8033 /* FindReplaceManager.swift */,
+				5A69DC5FA19C334A59D007F2 /* FindReplacePanel.swift */,
+				6D9A310BABE91A3F4967BD91 /* FormatCommands.swift */,
+				C29176D4EBDABAEA3F51072D /* Info.plist */,
+				A189EC07EACAE799956B41FC /* LunaPadApp.swift */,
+				39BE9960C2B7CB881FADFBAB /* MainView.swift */,
+				B0327DB5D8BFE8B99FCD9B2E /* NoteDocument.swift */,
+				A5A22818FBD15C166D263729 /* NoteTextEditor.swift */,
+				1CEEE1B573118F0D150E3EF7 /* StatusBarView.swift */,
+				BC62DCA1FCB3A4785FEE36A6 /* TabManager.swift */,
+				3E45CA2444B71DD61C5A33A2 /* WorkspaceManager.swift */,
+				BCBAF64E340F9E38DC8D3983 /* WorkspaceView.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		D1DE477B8E1266F0CA5C1ED3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				27FE3CF6C3D455CEB3F108EF /* LunaPad.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		80C4713A35B14DC6AD29921B /* LunaPad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 28D07425C226F0BCAF4FC865 /* Build configuration list for PBXNativeTarget "LunaPad" */;
+			buildPhases = (
+				070FC35C94F0F873E095607C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LunaPad;
+			packageProductDependencies = (
+			);
+			productName = LunaPad;
+			productReference = 27FE3CF6C3D455CEB3F108EF /* LunaPad.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B8750BC85A5C32FE39993BA3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					80C4713A35B14DC6AD29921B = {
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = A4CB254427CDACCAD109B2AA /* Build configuration list for PBXProject "LunaPad" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6CE3215C92E38A8C7F1393C4;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D1DE477B8E1266F0CA5C1ED3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				80C4713A35B14DC6AD29921B /* LunaPad */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		070FC35C94F0F873E095607C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A7E801F2666853946B89E9DA /* ContentView.swift in Sources */,
+				F535BBDF1A0D9751420FFF86 /* FindReplaceManager.swift in Sources */,
+				97E3B9FB2A066D9494EDA5ED /* FindReplacePanel.swift in Sources */,
+				C7EB4EFF79F7D76CFB408AA0 /* FormatCommands.swift in Sources */,
+				24346C47C383ABC325DE1A79 /* LunaPadApp.swift in Sources */,
+				3183F711804C568F3585DE29 /* MainView.swift in Sources */,
+				066CD2918C447DA0222550B5 /* NoteDocument.swift in Sources */,
+				79746E13D1A5860CB23EDE3E /* NoteTextEditor.swift in Sources */,
+				A573B5D99CE6A6399F812148 /* StatusBarView.swift in Sources */,
+				CD261A0FC0323644223F6936 /* TabManager.swift in Sources */,
+				19215E58DB4E3ABAD886C089 /* WorkspaceManager.swift in Sources */,
+				3EB59E93DDA70424F6D57DEF /* WorkspaceView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		773791A8D99B5595415571D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.gkeane.LunaPad;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		784399F3E7CF40F3CFF699E9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BA937EF701F9E37B53507BE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.gkeane.LunaPad;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		C9D0152059E849783358E92A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		28D07425C226F0BCAF4FC865 /* Build configuration list for PBXNativeTarget "LunaPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA937EF701F9E37B53507BE4 /* Debug */,
+				773791A8D99B5595415571D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A4CB254427CDACCAD109B2AA /* Build configuration list for PBXProject "LunaPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				784399F3E7CF40F3CFF699E9 /* Debug */,
+				C9D0152059E849783358E92A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B8750BC85A5C32FE39993BA3 /* Project object */;
+}

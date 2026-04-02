@@ -1,0 +1,9 @@
+.build/
+DerivedData/
+LunaPad.app/
+Notepad.app/
+Notepad.xcodeproj/
+.swiftpm/
+.DS_Store
+*.dSYM
+xcuserdata/

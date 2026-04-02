@@ -1,0 +1,35 @@
+name: LunaPad
+options:
+  bundleIdPrefix: io.github.gkeane
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+targets:
+  LunaPad:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.gkeane.LunaPad
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_REQUIRED: NO
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: LunaPad
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Plain Text Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.plain-text
+              - public.utf8-plain-text
+        NSSupportsAutomaticTermination: true
+        NSSupportsSuddenTermination: true

@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:notepad}",
+            "name": "Debug LunaPad",
+            "target": "LunaPad",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug LunaPad"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:notepad}",
+            "name": "Release LunaPad",
+            "target": "LunaPad",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release LunaPad"
+        }
+    ]
+}
