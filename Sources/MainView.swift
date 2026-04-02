@@ -1,4 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+private enum DragPayload {
+    static let workspace = "lunapad.workspace"
+    static let document = "lunapad.document"
+}
 
 struct MainView: View {
     @ObservedObject var workspaceManager: WorkspaceManager
@@ -35,6 +41,7 @@ struct MainView: View {
 
 private struct WorkspaceStrip: View {
     @ObservedObject var workspaceManager: WorkspaceManager
+    @State private var draggedWorkspaceID: UUID?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -47,9 +54,32 @@ private struct WorkspaceStrip: View {
                             canClose: workspaceManager.workspaces.count > 1,
                             onSelect: { workspaceManager.selectWorkspace(id: workspace.id) },
                             onCommitRename: { workspaceManager.commitName(for: workspace) },
-                            onClose: { workspaceManager.closeWorkspace(id: workspace.id) }
+                            onClose: { workspaceManager.closeWorkspace(id: workspace.id) },
+                            onDragStarted: {
+                                draggedWorkspaceID = workspace.id
+                                return provider(for: workspace.id, type: DragPayload.workspace)
+                            }
+                        )
+                        .onDrop(
+                            of: [.text],
+                            delegate: WorkspaceDropDelegate(
+                                targetWorkspaceID: workspace.id,
+                                draggedWorkspaceID: $draggedWorkspaceID,
+                                workspaceManager: workspaceManager
+                            )
                         )
                     }
+
+                    Color.clear
+                        .frame(width: 18, height: 34)
+                        .onDrop(
+                            of: [.text],
+                            delegate: WorkspaceDropDelegate(
+                                targetWorkspaceID: nil,
+                                draggedWorkspaceID: $draggedWorkspaceID,
+                                workspaceManager: workspaceManager
+                            )
+                        )
                 }
             }
 
@@ -76,6 +106,7 @@ private struct WorkspaceTabButton: View {
     let onSelect: () -> Void
     let onCommitRename: () -> Void
     let onClose: () -> Void
+    let onDragStarted: () -> NSItemProvider
     @FocusState private var nameFieldFocused: Bool
 
     init(
@@ -84,7 +115,8 @@ private struct WorkspaceTabButton: View {
         canClose: Bool,
         onSelect: @escaping () -> Void,
         onCommitRename: @escaping () -> Void,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        onDragStarted: @escaping () -> NSItemProvider
     ) {
         self.workspace = workspace
         self._tabManager = ObservedObject(wrappedValue: workspace.tabManager)
@@ -93,6 +125,7 @@ private struct WorkspaceTabButton: View {
         self.onSelect = onSelect
         self.onCommitRename = onCommitRename
         self.onClose = onClose
+        self.onDragStarted = onDragStarted
     }
 
     private var hasUnsavedChanges: Bool {
@@ -149,6 +182,7 @@ private struct WorkspaceTabButton: View {
         .background(isSelected ? Color(nsColor: .selectedControlColor).opacity(0.32) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
+        .onDrag { onDragStarted() }
         .overlay(alignment: .trailing) { Divider() }
     }
 }
@@ -231,6 +265,7 @@ private struct WorkspaceContentView: View {
 
 private struct FileTabStrip: View {
     @ObservedObject var tabManager: TabManager
+    @State private var draggedDocumentID: UUID?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -240,10 +275,33 @@ private struct FileTabStrip: View {
                         TabButton(
                             doc: doc,
                             isSelected: tabManager.selectedDocumentId == doc.id,
-                            onSelect: { tabManager.selectedDocumentId = doc.id },
-                            onClose: { tabManager.closeTab(id: doc.id) }
+                            onSelect: { tabManager.selectTab(id: doc.id) },
+                            onClose: { tabManager.closeTab(id: doc.id) },
+                            onDragStarted: {
+                                draggedDocumentID = doc.id
+                                return provider(for: doc.id, type: DragPayload.document)
+                            }
+                        )
+                        .onDrop(
+                            of: [.text],
+                            delegate: DocumentDropDelegate(
+                                targetDocumentID: doc.id,
+                                draggedDocumentID: $draggedDocumentID,
+                                tabManager: tabManager
+                            )
                         )
                     }
+
+                    Color.clear
+                        .frame(width: 18, height: 28)
+                        .onDrop(
+                            of: [.text],
+                            delegate: DocumentDropDelegate(
+                                targetDocumentID: nil,
+                                draggedDocumentID: $draggedDocumentID,
+                                tabManager: tabManager
+                            )
+                        )
                 }
             }
 
@@ -267,6 +325,7 @@ private struct TabButton: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
+    let onDragStarted: () -> NSItemProvider
 
     var body: some View {
         HStack(spacing: 4) {
@@ -293,6 +352,63 @@ private struct TabButton: View {
         .background(isSelected ? Color(nsColor: .selectedControlColor).opacity(0.4) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
+        .onDrag { onDragStarted() }
         .overlay(alignment: .trailing) { Divider() }
     }
+}
+
+private struct WorkspaceDropDelegate: DropDelegate {
+    let targetWorkspaceID: UUID?
+    @Binding var draggedWorkspaceID: UUID?
+    let workspaceManager: WorkspaceManager
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedWorkspaceID,
+              draggedWorkspaceID != targetWorkspaceID else { return }
+        workspaceManager.moveWorkspace(id: draggedWorkspaceID, before: targetWorkspaceID)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedWorkspaceID = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.text])
+    }
+}
+
+private struct DocumentDropDelegate: DropDelegate {
+    let targetDocumentID: UUID?
+    @Binding var draggedDocumentID: UUID?
+    let tabManager: TabManager
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedDocumentID,
+              draggedDocumentID != targetDocumentID else { return }
+        tabManager.moveTab(id: draggedDocumentID, before: targetDocumentID)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedDocumentID = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.text])
+    }
+}
+
+private func provider(for id: UUID, type: String) -> NSItemProvider {
+    let provider = NSItemProvider(object: id.uuidString as NSString)
+    provider.suggestedName = type
+    return provider
 }

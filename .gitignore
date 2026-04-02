@@ -3,6 +3,7 @@ DerivedData/
 LunaPad.app/
 Notepad.app/
 Notepad.xcodeproj/
+dist/
 .swiftpm/
 .DS_Store
 *.dSYM

@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="#features">Features</a> •
+  <a href="#download">Download</a> •
   <a href="#why-lunapad">Why LunaPad</a> •
   <a href="#install">Install</a> •
   <a href="#build-from-source">Build</a> •
@@ -36,6 +37,8 @@ That makes it practical to keep one workspace for scratch notes, one for a writi
 - Workspace super-tabs above document tabs
 - Renameable workspaces
 - Independent tab stacks per workspace
+- Drag-and-drop reordering for both workspace tabs and file tabs
+- Session restoration after relaunch or crash
 - Open multiple plain-text files
 - Save and Save As flows
 - Per-document dirty state indicators
@@ -57,6 +60,19 @@ Each workspace behaves like a named editing zone.
 Each workspace owns its own `TabManager` and `FindReplaceManager`, so switching workspaces preserves context instead of flattening everything into one tab row.
 
 This makes the app feel closer to having multiple small editors open at once, but with less window clutter.
+
+## Download
+
+You can download packaged builds from the GitHub Releases page:
+
+- [Latest release](https://github.com/gkeane/LunaPad/releases/latest)
+
+Current release assets include:
+
+- a zipped `LunaPad.app` bundle for macOS
+- a `.sha256` checksum file
+
+Note: current releases are unsigned local builds. On first launch, macOS may require an extra confirmation step unless future builds are signed and notarized.
 
 ## Install
 
@@ -112,7 +128,7 @@ The build script compiles the app, creates `LunaPad.app`, and refreshes the inst
 Sources/
   MainView.swift            Main UI, workspace strip, file tabs, editor layout
   WorkspaceManager.swift    Workspace-level state and switching
-  TabManager.swift          Per-workspace document management
+                           plus session persistence and restore
   FindReplaceManager.swift  Search and replace state
   NoteTextEditor.swift      AppKit-backed text editor bridge
 build.sh                    Build, bundle, and install script
@@ -132,8 +148,6 @@ It is for users who want:
 
 ## Roadmap
 
-- Drag-and-drop reordering for workspaces and file tabs
-- Session restoration on relaunch
 - Recent files and recent workspaces
 - Markdown preview mode
 - Search result highlighting in the editor gutter
