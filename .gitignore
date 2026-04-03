@@ -8,5 +8,11 @@ dist/
 .DS_Store
 *.dSYM
 xcuserdata/
+# Dev/planning docs
 agents.md
 design.md
+deisgn.md
+memoryplan.md
+threadingplan.md
+project.yml
+.claude/
