@@ -260,7 +260,8 @@ private struct WorkspaceContentView: View {
                 isMarkdownDoc: supportsMarkdownPreview(tabManager.currentDocument),
                 markdownDisplayMode: $workspace.markdownDisplayMode,
                 isLogDoc: tabManager.currentDocument?.isLog ?? false,
-                logAutoScroll: $logAutoScroll
+                logAutoScroll: $logAutoScroll,
+                workspace: workspace
             )
 
             if let doc = tabManager.currentDocument {
@@ -269,7 +270,21 @@ private struct WorkspaceContentView: View {
                 } else if let loadingDocumentError {
                     documentLoadFailureView(loadingDocumentError)
                 } else {
-                    documentBody(for: doc)
+                    let split = workspace.splitState
+                    let secondDoc = split != nil ? tabManager.documents.first(where: { $0.id == split?.secondDocumentId }) : nil
+                    let canShowSplit = split != nil && secondDoc != nil && !doc.isLargeDocument && !(secondDoc?.isLargeDocument ?? true)
+
+                    if canShowSplit {
+                        SplitPaneView(
+                            workspace: workspace,
+                            primaryDoc: doc,
+                            secondDoc: secondDoc!,
+                            wordWrap: wordWrap,
+                            font: font
+                        )
+                    } else {
+                        documentBody(for: doc)
+                    }
                 }
 
                 StatusBarView(
@@ -281,8 +296,10 @@ private struct WorkspaceContentView: View {
         }
         .onAppear {
             handleDocumentSelectionChange()
+            clearsplitStateIfInvalid()
         }
         .onChange(of: tabManager.selectedDocumentId) { _ in
+            clearsplitStateIfInvalid()
             selectedRange = nil
             selectedRangeScrollRequestID = 0
             logRefreshTask?.cancel()
@@ -302,6 +319,14 @@ private struct WorkspaceContentView: View {
     private func handleDocumentSelectionChange() {
         loadingDocumentError = nil
         Task { await ensureCurrentDocumentLoadedIfNeeded() }
+    }
+
+    private func clearsplitStateIfInvalid() {
+        guard let split = workspace.splitState else { return }
+        let secondDoc = tabManager.documents.first(where: { $0.id == split.secondDocumentId })
+        if secondDoc == nil || (tabManager.currentDocument?.isLargeDocument ?? false) || (secondDoc?.isLargeDocument ?? false) {
+            workspace.splitState = nil
+        }
     }
 
     private func ensureCurrentDocumentLoadedIfNeeded() async {
@@ -675,6 +700,7 @@ private struct FileTabStrip: View {
     @Binding var markdownDisplayMode: MarkdownDisplayMode
     let isLogDoc: Bool
     @Binding var logAutoScroll: Bool
+    let workspace: WorkspaceState
     @State private var draggedDocumentID: UUID?
 
     var body: some View {
@@ -691,7 +717,9 @@ private struct FileTabStrip: View {
                                 onDragStarted: {
                                     draggedDocumentID = doc.id
                                     return provider(for: doc.id, type: DragPayload.document)
-                                }
+                                },
+                                workspace: workspace,
+                                tabManager: tabManager
                             )
                             .id(doc.id)
                             .onDrop(
@@ -817,6 +845,8 @@ private struct TabButton: View {
     let onSelect: () -> Void
     let onClose: () -> Void
     let onDragStarted: () -> NSItemProvider
+    let workspace: WorkspaceState
+    let tabManager: TabManager
 
     var body: some View {
         HStack(spacing: 4) {
@@ -845,6 +875,18 @@ private struct TabButton: View {
         .help(doc.fileURL?.path ?? doc.displayName)
         .onTapGesture(perform: onSelect)
         .onDrag { onDragStarted() }
+        .contextMenu {
+            if tabManager.documents.count > 1 {
+                Menu("Open in Split") {
+                    Button("Horizontal") {
+                        workspace.splitState = SplitPaneState(axis: .horizontal, secondDocumentId: doc.id)
+                    }
+                    Button("Vertical") {
+                        workspace.splitState = SplitPaneState(axis: .vertical, secondDocumentId: doc.id)
+                    }
+                }
+            }
+        }
         .overlay(alignment: .trailing) { Divider() }
     }
 }

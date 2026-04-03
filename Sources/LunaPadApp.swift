@@ -201,6 +201,29 @@ struct LunaPadApp: App {
                 .keyboardShortcut("h", modifiers: .command)
             }
 
+            CommandMenu("View") {
+                Button("Split Horizontally") {
+                    guard let workspace = workspaceManager?.currentWorkspace,
+                          let doc = workspace.tabManager.currentDocument,
+                          workspace.tabManager.documents.count > 1 else { return }
+                    workspace.splitState = SplitPaneState(axis: .horizontal, secondDocumentId: workspace.tabManager.documents.first(where: { $0.id != doc.id })?.id ?? doc.id)
+                }
+                .keyboardShortcut("\\", modifiers: [.command, .control])
+
+                Button("Split Vertically") {
+                    guard let workspace = workspaceManager?.currentWorkspace,
+                          let doc = workspace.tabManager.currentDocument,
+                          workspace.tabManager.documents.count > 1 else { return }
+                    workspace.splitState = SplitPaneState(axis: .vertical, secondDocumentId: workspace.tabManager.documents.first(where: { $0.id != doc.id })?.id ?? doc.id)
+                }
+                .keyboardShortcut("-", modifiers: [.command, .control])
+
+                Button("Close Split") {
+                    workspaceManager?.currentWorkspace?.splitState = nil
+                }
+                .keyboardShortcut("w", modifiers: [.command, .control])
+            }
+
             FormatCommands()
             LunaModeCommands()
         }

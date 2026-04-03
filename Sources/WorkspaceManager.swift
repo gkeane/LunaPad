@@ -6,6 +6,14 @@ enum SessionPersistenceMode {
     case deferred
 }
 
+enum SplitAxis: String, Codable { case horizontal, vertical }
+
+struct SplitPaneState: Codable, Equatable {
+    var axis: SplitAxis
+    var secondDocumentId: UUID
+    var diffActive: Bool = false
+}
+
 enum MarkdownDisplayMode: String, CaseIterable, Identifiable {
     case editor
     case split
@@ -143,6 +151,7 @@ struct WorkspaceSnapshot: Codable, Identifiable {
     var name: String
     var documents: [OpenDocument]
     var selectedDocumentId: UUID?
+    var splitState: SplitPaneState?
 }
 
 struct WorkspaceSessionSnapshot: Codable {
@@ -382,6 +391,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
     @Published var name: String
     @Published var isRenaming: Bool
     @Published var markdownDisplayMode: MarkdownDisplayMode = .editor
+    @Published var splitState: SplitPaneState?
     let tabManager: TabManager
     let findReplaceManager: FindReplaceManager
 
@@ -417,12 +427,17 @@ final class WorkspaceState: ObservableObject, Identifiable {
             id: id,
             name: displayName,
             documents: tabManager.sessionSnapshot().documents,
-            selectedDocumentId: tabManager.selectedDocumentId
+            selectedDocumentId: tabManager.selectedDocumentId,
+            splitState: splitState
         )
     }
 
     private func bindChanges() {
         $name
+            .dropFirst()
+            .sink { [weak self] _ in self?.onStateChange?(.immediate) }
+            .store(in: &cancellables)
+        $splitState
             .dropFirst()
             .sink { [weak self] _ in self?.onStateChange?(.immediate) }
             .store(in: &cancellables)
@@ -545,7 +560,8 @@ final class WorkspaceManager: ObservableObject {
                 name: snapshot.name,
                 documents: snapshot.documents,
                 selectedDocumentId: snapshot.selectedDocumentId,
-                isRenaming: false
+                isRenaming: false,
+                splitState: snapshot.splitState
             )
             workspaces.append(workspace)
             selectedWorkspaceId = workspace.id
@@ -576,7 +592,8 @@ final class WorkspaceManager: ObservableObject {
         name: String,
         documents: [OpenDocument]?,
         selectedDocumentId: UUID?,
-        isRenaming: Bool
+        isRenaming: Bool,
+        splitState: SplitPaneState? = nil
     ) -> WorkspaceState {
         let tabManager = TabManager(
             snapshot: TabManagerSnapshot(
@@ -591,6 +608,11 @@ final class WorkspaceManager: ObservableObject {
             tabManager: tabManager,
             findReplaceManager: FindReplaceManager()
         )
+        // Restore split state only if the second document still exists
+        if let split = splitState,
+           tabManager.documents.contains(where: { $0.id == split.secondDocumentId }) {
+            workspace.splitState = split
+        }
         workspace.onStateChange = { [weak self] mode in
             self?.persistSession(using: mode)
         }
@@ -648,7 +670,8 @@ final class WorkspaceManager: ObservableObject {
                 name: $0.name,
                 documents: $0.documents,
                 selectedDocumentId: $0.selectedDocumentId,
-                isRenaming: false
+                isRenaming: false,
+                splitState: $0.splitState
             )
         }
         selectedWorkspaceId = snapshot.selectedWorkspaceId ?? workspaces.first?.id
