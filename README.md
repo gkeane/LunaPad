@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A focused macOS text editor with workspace-level super-tabs, per-workspace file tabs, fast keyboard workflows, and a clean native feel.
+  A focused native macOS editor with workspace-level super-tabs, per-workspace file tabs, markdown preview, log viewing, and a clean fast workflow.
 </p>
 
 <p align="center">
@@ -39,11 +39,17 @@ That makes it practical to keep one workspace for scratch notes, one for a writi
 - Independent tab stacks per workspace
 - Drag-and-drop reordering for both workspace tabs and file tabs
 - Session restoration after relaunch or crash
+- Recent files and recent workspaces menus
 - Open multiple plain-text files
+- File associations for common text, markdown, source, and log files
 - Save and Save As flows
 - Per-document dirty state indicators
 - Find and replace with next/previous navigation
 - Case-sensitive and whole-word search toggles
+- Search result markers in the editor gutter
+- Markdown editor, split, and preview modes
+- Live log viewing with level highlighting and auto-scroll toggle
+- App-wide Lunamode with System, Light, and Dark appearance modes
 - Word wrap toggle
 - Font panel integration
 - Live cursor line/column status bar
@@ -122,6 +128,15 @@ The build script compiles the app, creates `LunaPad.app`, and refreshes the inst
 - `Cmd-H` find and replace
 - `Cmd-T` font panel
 
+## Recent Highlights
+
+- Workspaces act like super-tabs, each with its own file tab row and editing state
+- Reopen recent files or entire recent workspaces from the File menu
+- Preview Markdown live in split or preview-only mode
+- Open `.log` files directly in LunaPad with live reload and level-based highlighting
+- Switch appearance instantly with Lunamode from the top bar or View menu
+- Keep search context visible with gutter markers across long documents
+
 ## Project Structure
 
 ```text
@@ -131,6 +146,8 @@ Sources/
                            plus session persistence and restore
   FindReplaceManager.swift  Search and replace state
   NoteTextEditor.swift      AppKit-backed text editor bridge
+  MarkdownRenderer.swift    Markdown preview rendering
+  LunaMode.swift            App-wide appearance controls and window theming
 build.sh                    Build, bundle, and install script
 bundle-app.sh               App bundle assembly
 ```
@@ -148,11 +165,10 @@ It is for users who want:
 
 ## Roadmap
 
-- Recent files and recent workspaces
-- Markdown preview mode
-- Search result highlighting in the editor gutter
 - Optional autosave and crash recovery
-- Custom app icon and signed distribution build
+- Unsaved-change prompts before closing documents or workspaces
+- Clickable log/search gutter markers for fast navigation
+- Signed and notarized distribution build
 
 ## Contributing
 
@@ -162,8 +178,8 @@ If you want to contribute, strong first candidates are:
 
 - usability polish on the workspace bar
 - keyboard navigation improvements
-- file reopen/session restore
 - better document lifecycle prompts for unsaved changes
+- release/signing automation
 - automated tests around workspace and tab state
 
 ## License
