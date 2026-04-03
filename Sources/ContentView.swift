@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     @Binding var document: NoteDocument
     @AppStorage("wordWrap") private var wordWrap: Bool = true
+    @AppStorage("showLineNumbers") private var showLineNumbers: Bool = false
     @AppStorage("fontName") private var fontName: String = "Menlo"
     @AppStorage("fontSize") private var fontSize: Double = 13
     @State private var cursorPosition = CursorPosition()
@@ -20,6 +21,7 @@ struct ContentView: View {
                 text: $document.text,
                 wordWrap: wordWrap,
                 font: editorFont,
+                showLineNumbers: showLineNumbers,
                 cursorPosition: $cursorPosition,
                 selectedRange: $selectedRange,
                 searchMatches: searchMatches,

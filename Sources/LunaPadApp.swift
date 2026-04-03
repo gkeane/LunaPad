@@ -91,7 +91,7 @@ struct LunaPadApp: App {
     ].compactMap { UTType(filenameExtension: $0) }
 
     var body: some Scene {
-        WindowGroup {
+        Window("LunaPad", id: "main") {
             WorkspaceView()
         }
         .commands {

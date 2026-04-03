@@ -225,12 +225,21 @@ private struct WorkspaceContentView: View {
     @ObservedObject var workspace: WorkspaceState
     @ObservedObject private var tabManager: TabManager
     @AppStorage(LunaMode.storageKey) private var lunaModeRawValue = LunaMode.system.rawValue
+    @AppStorage("showLineNumbers") private var showLineNumbers: Bool = false
     let wordWrap: Bool
     let font: NSFont
     @State private var cursorPosition = CursorPosition()
     @State private var selectedRange: NSRange?
+    @State private var selectedRangeScrollRequestID = 0
     @State private var logAutoScroll = true
     @State private var logWatcher: LogFileWatcher?
+    @State private var pendingLogRefresh: DispatchWorkItem?
+    @State private var logRefreshTask: Task<Void, Never>?
+    @State private var logRefreshRequestID = 0
+    @State private var logFileOffset: UInt64 = 0
+    @State private var loadingDocumentId: UUID?
+    @State private var loadingDocumentError: String?
+    @State private var largeDocumentEditorOverrides: Set<UUID> = []
 
     private var findReplaceManager: FindReplaceManager { workspace.findReplaceManager }
     private var lunaMode: LunaMode {
@@ -248,53 +257,162 @@ private struct WorkspaceContentView: View {
         VStack(spacing: 0) {
             FileTabStrip(
                 tabManager: tabManager,
-                isMarkdownDoc: tabManager.currentDocument?.isMarkdown ?? false,
+                isMarkdownDoc: supportsMarkdownPreview(tabManager.currentDocument),
                 markdownDisplayMode: $workspace.markdownDisplayMode,
                 isLogDoc: tabManager.currentDocument?.isLog ?? false,
                 logAutoScroll: $logAutoScroll
             )
 
             if let doc = tabManager.currentDocument {
-                documentBody(for: doc)
+                if loadingDocumentId == doc.id {
+                    documentLoadingView(for: doc)
+                } else if let loadingDocumentError {
+                    documentLoadFailureView(loadingDocumentError)
+                } else {
+                    documentBody(for: doc)
+                }
 
-                StatusBarView(cursorPosition: cursorPosition)
+                StatusBarView(
+                    cursorPosition: cursorPosition,
+                    isLargeDocument: doc.usesProtectedEditorMode && !isEditingLargeDocument(doc),
+                    canToggleLineNumbers: true
+                )
             }
         }
         .onAppear {
-            refreshSearchState()
-            setupLogWatcher()
+            handleDocumentSelectionChange()
         }
         .onChange(of: tabManager.selectedDocumentId) { _ in
             selectedRange = nil
-            refreshSearchState()
-            setupLogWatcher()
+            selectedRangeScrollRequestID = 0
+            logRefreshTask?.cancel()
+            logRefreshTask = nil
+            logRefreshRequestID &+= 1
+            handleDocumentSelectionChange()
         }
         .onChange(of: logAutoScroll) { enabled in
             guard enabled, let doc = tabManager.currentDocument, doc.isLog else { return }
-            selectedRange = NSRange(location: doc.content.utf16.count, length: 0)
+            setSelectedRangeIfNeeded(
+                NSRange(location: doc.content.utf16.count, length: 0),
+                forceScroll: true
+            )
         }
+    }
+
+    private func handleDocumentSelectionChange() {
+        loadingDocumentError = nil
+        Task { await ensureCurrentDocumentLoadedIfNeeded() }
+    }
+
+    private func ensureCurrentDocumentLoadedIfNeeded() async {
+        guard let doc = tabManager.currentDocument else { return }
+
+        if doc.requiresDiskReload {
+            loadingDocumentId = doc.id
+            do {
+                try await tabManager.ensureDocumentContentLoaded(doc.id)
+            } catch {
+                if tabManager.selectedDocumentId == doc.id {
+                    loadingDocumentError = error.localizedDescription
+                }
+            }
+            if loadingDocumentId == doc.id {
+                loadingDocumentId = nil
+            }
+        }
+
+        guard tabManager.selectedDocumentId == doc.id else { return }
+        refreshSearchState()
+        setupLogWatcher()
     }
 
     private func setupLogWatcher() {
         logWatcher = nil
+        pendingLogRefresh?.cancel()
+        pendingLogRefresh = nil
+        logRefreshTask?.cancel()
+        logRefreshTask = nil
+        logRefreshRequestID &+= 1
+        logFileOffset = 0
         guard let doc = tabManager.currentDocument, doc.isLog, let url = doc.fileURL else { return }
+        logFileOffset = LunaPadMemoryBudget.fileSize(at: url)
 
         // Scroll to bottom on tab switch if auto-scroll is on
         if logAutoScroll {
-            selectedRange = NSRange(location: doc.content.utf16.count, length: 0)
+            setSelectedRangeIfNeeded(
+                NSRange(location: doc.content.utf16.count, length: 0),
+                forceScroll: true
+            )
         }
 
         logWatcher = LogFileWatcher(url: url) {
-            guard let data = try? Data(contentsOf: url),
-                  let content = String(data: data, encoding: .utf8),
-                  content != tabManager.currentDocument?.content else { return }
-            tabManager.updateDocument(doc.id, fileURL: url, content: content, isSaved: true)
-            findReplaceManager.updateMatches(in: content)
-            if findReplaceManager.isOpen && !logAutoScroll {
-                selectedRange = findReplaceManager.currentMatch
-            }
-            if logAutoScroll {
-                selectedRange = NSRange(location: content.utf16.count, length: 0)
+            scheduleLogRefresh(for: doc.id, url: url)
+        }
+    }
+
+    private func scheduleLogRefresh(for documentID: UUID, url: URL) {
+        pendingLogRefresh?.cancel()
+        let workItem = DispatchWorkItem {
+            applyLogRefresh(for: documentID, url: url)
+        }
+        pendingLogRefresh = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + LunaPadMemoryBudget.logRefreshCoalesceDelay,
+            execute: workItem
+        )
+    }
+
+    private func applyLogRefresh(for documentID: UUID, url: URL) {
+        pendingLogRefresh = nil
+
+        guard let currentDocument = tabManager.currentDocument,
+              currentDocument.id == documentID else { return }
+        let capturedContent = currentDocument.content
+        let capturedOffset = logFileOffset
+        let refreshRequestID = logRefreshRequestID &+ 1
+        logRefreshRequestID = refreshRequestID
+        logRefreshTask?.cancel()
+        logRefreshTask = Task(priority: .userInitiated) {
+            let result = try? await Task.detached(priority: .userInitiated) {
+                try LunaPadMemoryBudget.refreshLogContent(
+                    currentContent: capturedContent,
+                    from: url,
+                    startingAt: capturedOffset
+                )
+            }.value
+
+            guard !Task.isCancelled,
+                  let result else { return }
+
+            await MainActor.run {
+                guard logRefreshRequestID == refreshRequestID,
+                      let activeDocument = tabManager.currentDocument,
+                      activeDocument.id == documentID else { return }
+
+                logFileOffset = result.nextOffset
+                guard result.content != activeDocument.content else { return }
+
+                tabManager.updateDocument(
+                    documentID,
+                    fileURL: url,
+                    content: result.content,
+                    isSaved: true,
+                    persistenceMode: .deferred
+                )
+
+                findReplaceManager.scheduleMatchUpdate(
+                    in: activeDocument.isLargeDocument ? "" : result.content
+                ) { match in
+                    if findReplaceManager.isOpen && !logAutoScroll {
+                        setSelectedRangeIfNeeded(match)
+                    }
+                }
+                if logAutoScroll {
+                    setSelectedRangeIfNeeded(
+                        NSRange(location: result.content.utf16.count, length: 0),
+                        forceScroll: true
+                    )
+                }
             }
         }
     }
@@ -319,54 +437,173 @@ private struct WorkspaceContentView: View {
         }
     }
 
+    private func documentLoadingView(for doc: OpenDocument) -> some View {
+        VStack(spacing: 10) {
+            ProgressView()
+            Text("Loading \(doc.displayName)…")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private func documentLoadFailureView(_ message: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+            Text("Could not load document")
+                .font(.system(size: 13, weight: .semibold))
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
     private func effectiveDisplayMode(for doc: OpenDocument) -> MarkdownDisplayMode {
-        doc.isMarkdown ? workspace.markdownDisplayMode : .editor
+        supportsMarkdownPreview(doc) ? workspace.markdownDisplayMode : .editor
+    }
+
+    private func supportsMarkdownPreview(_ doc: OpenDocument?) -> Bool {
+        guard let doc else { return false }
+        return doc.isMarkdown && doc.content.count <= LunaPadMemoryBudget.markdownPreviewCharacterLimit
+    }
+
+    private func isEditingLargeDocument(_ doc: OpenDocument) -> Bool {
+        largeDocumentEditorOverrides.contains(doc.id)
+    }
+
+    private func usesProtectedEditorMode(_ doc: OpenDocument) -> Bool {
+        doc.usesProtectedEditorMode && !isEditingLargeDocument(doc)
+    }
+
+    private func isChunkedLargeDocumentView(_ doc: OpenDocument) -> Bool {
+        doc.usesChunkedViewer && !isEditingLargeDocument(doc)
     }
 
     @ViewBuilder
     private func editorPane(for doc: OpenDocument) -> some View {
-        VStack(spacing: 0) {
-            NoteTextEditor(
-                text: Binding(
-                    get: { doc.content },
-                    set: {
-                        tabManager.updateContent(doc.id, $0)
-                        findReplaceManager.updateMatches(in: $0)
-                    }
-                ),
-                wordWrap: wordWrap,
-                font: font,
-                cursorPosition: $cursorPosition,
-                selectedRange: $selectedRange,
-                searchMatches: findReplaceManager.isOpen ? findReplaceManager.allMatches : [],
-                currentSearchMatch: findReplaceManager.isOpen ? findReplaceManager.currentMatch : nil,
-                isLog: doc.isLog
-            )
+        let usesReducedLargeFileMode = usesProtectedEditorMode(doc)
 
-            if findReplaceManager.isOpen {
+        VStack(spacing: 0) {
+            if doc.usesProtectedEditorMode {
+                LargeDocumentNotice(
+                    isEditingEnabled: isEditingLargeDocument(doc),
+                    isChunkedViewer: isChunkedLargeDocumentView(doc),
+                    onToggleEdit: {
+                        toggleLargeDocumentEditing(doc)
+                    }
+                )
+            }
+
+            if usesReducedLargeFileMode {
+                if let url = doc.fileURL, doc.usesChunkedViewer {
+                    LargeFileViewer(
+                        fileURL: url,
+                        fileSize: max(doc.byteCount, doc.content.count),
+                        wordWrap: wordWrap,
+                        font: font,
+                        showLineNumbers: showLineNumbers,
+                        cursorPosition: $cursorPosition,
+                        selectedRange: $selectedRange,
+                        selectedRangeScrollRequestID: selectedRangeScrollRequestID
+                    )
+                } else {
+                    LargeFileViewer(
+                        text: doc.content,
+                        wordWrap: wordWrap,
+                        font: font,
+                        showLineNumbers: showLineNumbers,
+                        cursorPosition: $cursorPosition,
+                        selectedRange: $selectedRange,
+                        selectedRangeScrollRequestID: selectedRangeScrollRequestID
+                    )
+                }
+            } else {
+                NoteTextEditor(
+                    text: Binding(
+                        get: { doc.content },
+                        set: {
+                            tabManager.updateContent(doc.id, $0)
+                            findReplaceManager.scheduleMatchUpdate(in: $0, isLargeDocument: doc.isLargeDocument)
+                        }
+                    ),
+                    wordWrap: wordWrap,
+                    font: font,
+                    showLineNumbers: showLineNumbers,
+                    isLargeDocument: false,
+                    isEditable: !usesReducedLargeFileMode,
+                    cursorPosition: $cursorPosition,
+                    selectedRange: $selectedRange,
+                    selectedRangeScrollRequestID: selectedRangeScrollRequestID,
+                    searchMatches: findReplaceManager.isOpen && !doc.isLargeDocument ? findReplaceManager.allMatches : [],
+                    currentSearchMatch: findReplaceManager.isOpen && !doc.isLargeDocument ? findReplaceManager.currentMatch : nil,
+                    isLog: doc.isLog
+                )
+            }
+
+            if findReplaceManager.isOpen && !isChunkedLargeDocumentView(doc) {
                 FindReplacePanel(
                     manager: findReplaceManager,
+                    isReplaceEnabled: !doc.isLargeDocument,
                     onSearchOptionsChanged: {
-                        findReplaceManager.updateMatches(in: doc.content)
-                        selectedRange = findReplaceManager.currentMatch
+                        findReplaceManager.scheduleMatchUpdate(
+                            in: doc.content,
+                            isLargeDocument: doc.isLargeDocument
+                        ) { match in
+                            selectedRange = match
+                        }
                     },
                     onFindNext: {
-                        selectedRange = findReplaceManager.findNext(in: doc.content)
+                        if doc.isLargeDocument {
+                            let start = (selectedRange.map { NSMaxRange($0) }) ?? cursorPosition.location
+                            selectedRange = findReplaceManager.findNextOnDemand(in: doc.content, after: start)
+                        } else {
+                            Task {
+                                let match = await findReplaceManager.findNextAsync(in: doc.content)
+                                selectedRange = match
+                            }
+                        }
                     },
                     onFindPrevious: {
-                        selectedRange = findReplaceManager.findPrevious(in: doc.content)
+                        if doc.isLargeDocument {
+                            let start = (selectedRange?.location) ?? cursorPosition.location
+                            selectedRange = findReplaceManager.findPreviousOnDemand(in: doc.content, before: start)
+                        } else {
+                            Task {
+                                let match = await findReplaceManager.findPreviousAsync(in: doc.content)
+                                selectedRange = match
+                            }
+                        }
                     },
                     onReplace: {
-                        let replaced = findReplaceManager.replaceCurrent(in: doc.content)
-                        tabManager.updateContent(doc.id, replaced)
-                        findReplaceManager.updateMatches(in: replaced)
-                        selectedRange = findReplaceManager.currentMatch
+                        Task {
+                            let replaced = await findReplaceManager.replaceCurrentAsync(in: doc.content)
+                            tabManager.updateContent(doc.id, replaced)
+                            findReplaceManager.scheduleMatchUpdate(
+                                in: replaced,
+                                isLargeDocument: doc.isLargeDocument
+                            ) { match in
+                                selectedRange = match
+                            }
+                        }
                     },
                     onReplaceAll: {
-                        let replaced = findReplaceManager.replaceAll(in: doc.content)
-                        tabManager.updateContent(doc.id, replaced)
-                        findReplaceManager.updateMatches(in: replaced)
-                        selectedRange = findReplaceManager.currentMatch
+                        Task {
+                            let replaced = await findReplaceManager.replaceAllAsync(in: doc.content)
+                            tabManager.updateContent(doc.id, replaced)
+                            findReplaceManager.scheduleMatchUpdate(
+                                in: replaced,
+                                isLargeDocument: doc.isLargeDocument
+                            ) { match in
+                                selectedRange = match
+                            }
+                        }
                     },
                     onClose: { findReplaceManager.isOpen = false }
                 )
@@ -375,9 +612,58 @@ private struct WorkspaceContentView: View {
     }
 
     private func refreshSearchState() {
-        if let content = tabManager.currentDocument?.content {
-            findReplaceManager.updateMatches(in: content)
-            selectedRange = findReplaceManager.currentMatch
+        if let doc = tabManager.currentDocument {
+            findReplaceManager.scheduleMatchUpdate(
+                in: doc.content,
+                isLargeDocument: doc.isLargeDocument
+            ) { match in
+                setSelectedRangeIfNeeded(match)
+            }
+        }
+    }
+
+    private func toggleLargeDocumentEditing(_ doc: OpenDocument) {
+        if isEditingLargeDocument(doc) {
+            largeDocumentEditorOverrides.remove(doc.id)
+            if doc.isSaved {
+                tabManager.unloadChunkedLargeDocument(doc.id)
+            }
+            return
+        }
+
+        guard doc.usesChunkedViewer else {
+            largeDocumentEditorOverrides.insert(doc.id)
+            return
+        }
+
+        loadingDocumentError = nil
+        loadingDocumentId = doc.id
+        Task {
+            do {
+                try await tabManager.loadFullDocumentContent(doc.id)
+                await MainActor.run {
+                    guard tabManager.selectedDocumentId == doc.id else { return }
+                    loadingDocumentId = nil
+                    largeDocumentEditorOverrides.insert(doc.id)
+                    refreshSearchState()
+                }
+            } catch {
+                await MainActor.run {
+                    if tabManager.selectedDocumentId == doc.id {
+                        loadingDocumentId = nil
+                        loadingDocumentError = error.localizedDescription
+                    }
+                }
+            }
+        }
+    }
+
+    private func setSelectedRangeIfNeeded(_ range: NSRange?, forceScroll: Bool = false) {
+        let rangeChanged = selectedRange != range
+        guard rangeChanged || forceScroll else { return }
+        selectedRange = range
+        if forceScroll, range != nil {
+            selectedRangeScrollRequestID &+= 1
         }
     }
 }
@@ -489,6 +775,39 @@ private struct FileTabStrip: View {
         .padding(.vertical, 4)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+private struct LargeDocumentNotice: View {
+    let isEditingEnabled: Bool
+    let isChunkedViewer: Bool
+    let onToggleEdit: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack {
+                Image(systemName: "bolt.horizontal.circle")
+                    .foregroundStyle(.secondary)
+                Text(
+                    isEditingEnabled
+                    ? "Large file mode is active. Editing is enabled, but search stays on-demand and gutter markers and line numbers stay reduced to keep LunaPad responsive."
+                    : (isChunkedViewer
+                        ? "Large file mode is active. LunaPad is showing this file in chunked read-only view to keep memory usage low. Choose Edit Anyway to load the full file into memory."
+                        : "Large file mode is active. The file is opened read-only by default, and search stays on-demand while gutter markers and line numbers stay reduced to keep LunaPad responsive.")
+                )
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Button(isEditingEnabled ? "Return to Safe Mode" : "Edit Anyway") {
+                    onToggleEdit()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                Spacer()
+            }
+            .padding(8)
+            .background(.bar)
+        }
     }
 }
 

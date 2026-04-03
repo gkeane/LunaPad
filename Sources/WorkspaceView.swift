@@ -16,6 +16,9 @@ struct WorkspaceView: View {
             .focusedSceneValue(\.workspaceManager, workspaceManager)
             .focusedSceneValue(\.tabManager, workspaceManager.currentTabManager)
             .focusedSceneValue(\.findReplaceManager, workspaceManager.currentFindReplaceManager)
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                workspaceManager.flushSessionPersistence()
+            }
             .onAppear {
                 ExternalFileOpenCoordinator.shared.activate(workspaceManager)
             }

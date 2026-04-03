@@ -1,6 +1,11 @@
 import Combine
 import Foundation
 
+enum SessionPersistenceMode {
+    case immediate
+    case deferred
+}
+
 enum MarkdownDisplayMode: String, CaseIterable, Identifiable {
     case editor
     case split
@@ -30,6 +35,48 @@ struct OpenDocument: Identifiable, Codable, Equatable {
     var fileURL: URL?
     var content: String
     var isSaved: Bool
+    var requiresDiskReload: Bool = false
+    var byteCount: Int = 0
+    var sessionCacheFileName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case fileURL
+        case content
+        case isSaved
+        case requiresDiskReload
+        case byteCount
+        case sessionCacheFileName
+    }
+
+    init(
+        id: UUID,
+        fileURL: URL?,
+        content: String,
+        isSaved: Bool,
+        requiresDiskReload: Bool = false,
+        byteCount: Int = 0,
+        sessionCacheFileName: String? = nil
+    ) {
+        self.id = id
+        self.fileURL = fileURL
+        self.content = content
+        self.isSaved = isSaved
+        self.requiresDiskReload = requiresDiskReload
+        self.byteCount = byteCount
+        self.sessionCacheFileName = sessionCacheFileName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        fileURL = try container.decodeIfPresent(URL.self, forKey: .fileURL)
+        content = try container.decodeIfPresent(String.self, forKey: .content) ?? ""
+        isSaved = try container.decodeIfPresent(Bool.self, forKey: .isSaved) ?? true
+        requiresDiskReload = try container.decodeIfPresent(Bool.self, forKey: .requiresDiskReload) ?? false
+        byteCount = try container.decodeIfPresent(Int.self, forKey: .byteCount) ?? 0
+        sessionCacheFileName = try container.decodeIfPresent(String.self, forKey: .sessionCacheFileName)
+    }
 
     var displayName: String {
         if let url = fileURL {
@@ -47,6 +94,27 @@ struct OpenDocument: Identifiable, Codable, Equatable {
     var isLog: Bool {
         guard let fileURL else { return false }
         return fileURL.pathExtension.lowercased() == "log"
+    }
+
+    var estimatedSize: Int {
+        max(content.count, byteCount)
+    }
+
+    var isLargeDocument: Bool {
+        estimatedSize >= LunaPadMemoryBudget.largeDocumentCharacterLimit
+    }
+
+    var usesProtectedEditorMode: Bool {
+        estimatedSize >= LunaPadMemoryBudget.protectedEditorCharacterLimit &&
+        isSaved &&
+        fileURL != nil &&
+        !isLog
+    }
+
+    var usesChunkedViewer: Bool {
+        usesProtectedEditorMode &&
+        sessionCacheFileName == nil &&
+        content.isEmpty
     }
 }
 
@@ -87,7 +155,7 @@ final class TabManager: ObservableObject {
     @Published var documents: [OpenDocument]
     @Published var selectedDocumentId: UUID?
 
-    var onStateChange: (() -> Void)?
+    var onStateChange: ((SessionPersistenceMode) -> Void)?
 
     init(snapshot: TabManagerSnapshot? = nil) {
         if let snapshot, !snapshot.documents.isEmpty {
@@ -108,16 +176,23 @@ final class TabManager: ObservableObject {
         TabManagerSnapshot(documents: documents, selectedDocumentId: selectedDocumentId)
     }
 
+    func sessionSnapshot() -> TabManagerSnapshot {
+        TabManagerSnapshot(
+            documents: documents.map { persistedSnapshot(for: $0) },
+            selectedDocumentId: selectedDocumentId
+        )
+    }
+
     func newTab() {
         let doc = OpenDocument(id: UUID(), fileURL: nil, content: "", isSaved: true)
         documents.append(doc)
         selectedDocumentId = doc.id
-        onStateChange?()
+        onStateChange?(.immediate)
     }
 
     func selectTab(id: UUID) {
         selectedDocumentId = id
-        onStateChange?()
+        onStateChange?(.immediate)
     }
 
     func closeTab(id: UUID) {
@@ -126,7 +201,7 @@ final class TabManager: ObservableObject {
         if selectedDocumentId == id {
             selectedDocumentId = documents.first?.id
         }
-        onStateChange?()
+        onStateChange?(.immediate)
     }
 
     func moveTab(id: UUID, before targetID: UUID?) {
@@ -141,42 +216,163 @@ final class TabManager: ObservableObject {
         }
 
         documents.insert(document, at: insertionIndex)
-        onStateChange?()
+        onStateChange?(.immediate)
     }
 
     func updateContent(_ id: UUID, _ content: String) {
         if let index = documents.firstIndex(where: { $0.id == id }) {
             documents[index].content = content
             documents[index].isSaved = false
-            onStateChange?()
+            documents[index].requiresDiskReload = false
+            onStateChange?(.deferred)
         }
     }
 
-    func updateDocument(_ id: UUID, fileURL: URL?, content: String, isSaved: Bool) {
+    func updateDocument(
+        _ id: UUID,
+        fileURL: URL?,
+        content: String,
+        isSaved: Bool,
+        persistenceMode: SessionPersistenceMode = .immediate
+    ) {
         if let index = documents.firstIndex(where: { $0.id == id }) {
             documents[index].fileURL = fileURL
             documents[index].content = content
             documents[index].isSaved = isSaved
-            onStateChange?()
+            if isSaved {
+                SessionDocumentCache.remove(fileName: documents[index].sessionCacheFileName)
+                documents[index].sessionCacheFileName = nil
+            }
+            onStateChange?(persistenceMode)
         }
     }
 
     func saveDocument(_ id: UUID, to url: URL) async throws {
         guard let doc = documents.first(where: { $0.id == id }) else { return }
         let data = doc.content.data(using: .utf8) ?? Data()
-        try data.write(to: url)
+        try await Task.detached(priority: .userInitiated) {
+            try data.write(to: url, options: .atomic)
+        }.value
         updateDocument(id, fileURL: url, content: doc.content, isSaved: true)
     }
 
     func loadDocument(from url: URL) async throws {
-        let data = try Data(contentsOf: url)
-        guard let content = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "FileError", code: 1)
-        }
-        let doc = OpenDocument(id: UUID(), fileURL: url, content: content, isSaved: true)
+        let byteCount = Int(LunaPadMemoryBudget.fileSize(at: url))
+        let isLog = url.pathExtension.lowercased() == "log"
+        let shouldUseChunkedViewer = byteCount >= LunaPadMemoryBudget.protectedEditorCharacterLimit && !isLog
+
+        let doc = OpenDocument(
+            id: UUID(),
+            fileURL: url,
+            content: "",
+            isSaved: true,
+            requiresDiskReload: !shouldUseChunkedViewer,
+            byteCount: byteCount
+        )
         documents.append(doc)
         selectedDocumentId = doc.id
-        onStateChange?()
+        onStateChange?(.immediate)
+        if !shouldUseChunkedViewer {
+            try await ensureDocumentContentLoaded(doc.id)
+        }
+    }
+
+    func ensureDocumentContentLoaded(_ id: UUID) async throws {
+        guard let document = documents.first(where: { $0.id == id }),
+              document.requiresDiskReload else { return }
+
+        if document.usesChunkedViewer {
+            if let index = documents.firstIndex(where: { $0.id == id }) {
+                documents[index].requiresDiskReload = false
+            }
+            return
+        }
+
+        let content = try await Task.detached(priority: .userInitiated) {
+            if let sessionCacheFileName = document.sessionCacheFileName {
+                return try SessionDocumentCache.loadContent(fileName: sessionCacheFileName)
+            }
+            guard let url = document.fileURL else {
+                throw NSError(domain: "LunaPad.Load", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "No source is available for this document."
+                ])
+            }
+            return try LunaPadMemoryBudget.loadDocumentContent(from: url)
+        }.value
+
+        if let index = documents.firstIndex(where: { $0.id == id }) {
+            documents[index].fileURL = document.fileURL
+            documents[index].content = content
+            documents[index].isSaved = document.isSaved
+            documents[index].requiresDiskReload = false
+            documents[index].byteCount = max(document.byteCount, content.count)
+            onStateChange?(.deferred)
+        }
+    }
+
+    func loadFullDocumentContent(_ id: UUID) async throws {
+        guard let document = documents.first(where: { $0.id == id }) else { return }
+
+        let content = try await Task.detached(priority: .userInitiated) {
+            if let sessionCacheFileName = document.sessionCacheFileName {
+                return try SessionDocumentCache.loadContent(fileName: sessionCacheFileName)
+            }
+            guard let url = document.fileURL else {
+                throw NSError(domain: "LunaPad.Load", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "No source is available for this document."
+                ])
+            }
+            return try LunaPadMemoryBudget.loadDocumentContent(from: url)
+        }.value
+
+        if let index = documents.firstIndex(where: { $0.id == id }) {
+            documents[index].content = content
+            documents[index].requiresDiskReload = false
+            documents[index].byteCount = max(documents[index].byteCount, content.count)
+            onStateChange?(.deferred)
+        }
+    }
+
+    func unloadChunkedLargeDocument(_ id: UUID) {
+        guard let index = documents.firstIndex(where: { $0.id == id }) else { return }
+        let document = documents[index]
+        guard document.usesProtectedEditorMode else { return }
+
+        documents[index].content = ""
+        documents[index].requiresDiskReload = false
+        onStateChange?(.deferred)
+    }
+
+    private func persistedSnapshot(for document: OpenDocument) -> OpenDocument {
+        if !document.isSaved {
+            if document.requiresDiskReload,
+               document.content.isEmpty,
+               document.sessionCacheFileName != nil {
+                return document
+            }
+
+            guard let cacheFileName = SessionDocumentCache.write(content: document.content, for: document.id) else {
+                return document
+            }
+            var cached = document
+            cached.content = ""
+            cached.requiresDiskReload = true
+            cached.byteCount = document.content.count
+            cached.sessionCacheFileName = cacheFileName
+            return cached
+        }
+
+        guard document.isSaved,
+              document.fileURL != nil,
+              document.content.count > LunaPadMemoryBudget.maxInlineSessionDocumentCharacters else {
+            return document
+        }
+
+        var lightweight = document
+        lightweight.content = ""
+        lightweight.requiresDiskReload = false
+        lightweight.sessionCacheFileName = nil
+        return lightweight
     }
 }
 
@@ -190,7 +386,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
     let findReplaceManager: FindReplaceManager
 
     private var cancellables: Set<AnyCancellable> = []
-    var onStateChange: (() -> Void)? {
+    var onStateChange: ((SessionPersistenceMode) -> Void)? {
         didSet {
             tabManager.onStateChange = onStateChange
         }
@@ -220,7 +416,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
         WorkspaceSnapshot(
             id: id,
             name: displayName,
-            documents: tabManager.documents,
+            documents: tabManager.sessionSnapshot().documents,
             selectedDocumentId: tabManager.selectedDocumentId
         )
     }
@@ -228,7 +424,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
     private func bindChanges() {
         $name
             .dropFirst()
-            .sink { [weak self] _ in self?.onStateChange?() }
+            .sink { [weak self] _ in self?.onStateChange?(.immediate) }
             .store(in: &cancellables)
     }
 }
@@ -244,12 +440,16 @@ final class WorkspaceManager: ObservableObject {
     private let recentItemsKey = "LunaPadRecentItems"
     private let maxRecentFiles = 20
     private let maxRecentWorkspaces = 10
+    private var pendingSessionPersistence: DispatchWorkItem?
 
     init() {
         restoreRecentItems()
         if !restoreSession() {
+            SessionDocumentCache.cleanup(retaining: [])
             _ = newWorkspace(selectAndRename: false)
-            persistSession()
+            persistSessionNow()
+        } else {
+            cleanupSessionCachesForCurrentState()
         }
     }
 
@@ -277,13 +477,13 @@ final class WorkspaceManager: ObservableObject {
         )
         workspaces.append(workspace)
         selectedWorkspaceId = workspace.id
-        persistSession()
+        persistSessionNow()
         return workspace
     }
 
     func selectWorkspace(id: UUID) {
         selectedWorkspaceId = id
-        persistSession()
+        persistSessionNow()
     }
 
     func moveWorkspace(id: UUID, before targetID: UUID?) {
@@ -298,7 +498,7 @@ final class WorkspaceManager: ObservableObject {
         }
 
         workspaces.insert(workspace, at: insertionIndex)
-        persistSession()
+        persistSessionNow()
     }
 
     func closeWorkspace(id: UUID) {
@@ -315,14 +515,14 @@ final class WorkspaceManager: ObservableObject {
             selectedWorkspaceId = workspaces[replacementIndex].id
         }
 
-        persistSession()
+        persistSessionNow()
     }
 
     func commitName(for workspace: WorkspaceState) {
         objectWillChange.send()
         workspace.name = workspace.displayName
         workspace.isRenaming = false
-        persistSession()
+        persistSessionNow()
     }
 
     func noteRecentFile(_ url: URL) {
@@ -350,7 +550,7 @@ final class WorkspaceManager: ObservableObject {
             workspaces.append(workspace)
             selectedWorkspaceId = workspace.id
         }
-        persistSession()
+        persistSessionNow()
     }
 
     func clearRecentFiles() {
@@ -391,20 +591,48 @@ final class WorkspaceManager: ObservableObject {
             tabManager: tabManager,
             findReplaceManager: FindReplaceManager()
         )
-        workspace.onStateChange = { [weak self] in
-            self?.persistSession()
+        workspace.onStateChange = { [weak self] mode in
+            self?.persistSession(using: mode)
         }
         return workspace
     }
 
-    private func persistSession() {
+    private func persistSession(using mode: SessionPersistenceMode) {
+        switch mode {
+        case .immediate:
+            persistSessionNow()
+        case .deferred:
+            scheduleSessionPersistence()
+        }
+    }
+
+    private func scheduleSessionPersistence() {
+        pendingSessionPersistence?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.persistSessionNow()
+        }
+        pendingSessionPersistence = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + LunaPadMemoryBudget.deferredSessionPersistenceDelay,
+            execute: workItem
+        )
+    }
+
+    private func persistSessionNow() {
+        pendingSessionPersistence?.cancel()
+        pendingSessionPersistence = nil
         let snapshot = WorkspaceSessionSnapshot(
             selectedWorkspaceId: selectedWorkspaceId,
             workspaces: workspaces.map { $0.snapshot() }
         )
+        cleanupSessionCaches(retaining: retainedCacheFileNames(for: snapshot))
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: sessionKey)
+    }
+
+    func flushSessionPersistence() {
+        persistSessionNow()
     }
 
     private func restoreSession() -> Bool {
@@ -425,6 +653,30 @@ final class WorkspaceManager: ObservableObject {
         }
         selectedWorkspaceId = snapshot.selectedWorkspaceId ?? workspaces.first?.id
         return true
+    }
+
+    private func retainedCacheFileNames(for snapshot: WorkspaceSessionSnapshot) -> Set<String> {
+        Set(
+            snapshot.workspaces
+                .flatMap(\.documents)
+                .compactMap(\.sessionCacheFileName)
+        )
+    }
+
+    private func retainedCacheFileNamesForCurrentState() -> Set<String> {
+        retainedCacheFileNames(for: WorkspaceSessionSnapshot(
+            selectedWorkspaceId: selectedWorkspaceId,
+            workspaces: workspaces.map { $0.snapshot() }
+        ))
+    }
+
+    private func cleanupSessionCachesForCurrentState() {
+        cleanupSessionCaches(retaining: retainedCacheFileNamesForCurrentState())
+    }
+
+    private func cleanupSessionCaches(retaining retainedCacheFiles: Set<String>) {
+        SessionDocumentCache.migrateRetainedFilesToApplicationSupport(retaining: retainedCacheFiles)
+        SessionDocumentCache.cleanup(retaining: retainedCacheFiles)
     }
 
     private func rememberRecentWorkspace(_ snapshot: WorkspaceSnapshot) {

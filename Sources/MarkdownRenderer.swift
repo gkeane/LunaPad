@@ -7,6 +7,10 @@ struct MarkdownPreviewView: NSViewRepresentable {
     let text: String
     var lunaMode: LunaMode = .system
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -15,8 +19,47 @@ struct MarkdownPreviewView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        let html = markdownToHTML(text, lunaMode: lunaMode)
-        webView.loadHTMLString(html, baseURL: nil)
+        context.coordinator.scheduleRender(
+            text: text,
+            lunaMode: lunaMode,
+            into: webView
+        )
+    }
+
+    final class Coordinator {
+        private var pendingRender: DispatchWorkItem?
+        private var renderTask: Task<Void, Never>?
+        private var lastRenderKey: String?
+        private var renderGeneration = 0
+
+        func scheduleRender(text: String, lunaMode: LunaMode, into webView: WKWebView) {
+            pendingRender?.cancel()
+            let renderKey = "\(lunaMode.rawValue):\(text)"
+            guard renderKey != lastRenderKey else { return }
+
+            renderGeneration &+= 1
+            let generation = renderGeneration
+            let workItem = DispatchWorkItem { [weak self, weak webView] in
+                guard let self, let webView else { return }
+
+                self.renderTask?.cancel()
+                self.renderTask = Task(priority: .utility) {
+                    let html = await Task.detached(priority: .utility) {
+                        markdownToHTML(text, lunaMode: lunaMode)
+                    }.value
+
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        guard self.renderGeneration == generation else { return }
+                        webView.loadHTMLString(html, baseURL: nil)
+                    }
+                }
+            }
+
+            pendingRender = workItem
+            lastRenderKey = renderKey
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+        }
     }
 }
 

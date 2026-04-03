@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FindReplacePanel: View {
     @ObservedObject var manager: FindReplaceManager
+    var isReplaceEnabled: Bool = true
     var onSearchOptionsChanged: () -> Void
     var onFindNext: () -> Void
     var onFindPrevious: () -> Void
@@ -24,6 +25,10 @@ struct FindReplacePanel: View {
 
                     if manager.matchCount > 0 {
                         Text("\(manager.currentMatchIndex + 1)/\(manager.matchCount)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else if !manager.modeDescription.isEmpty {
+                        Text(manager.modeDescription)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -65,6 +70,7 @@ struct FindReplacePanel: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .disabled(!isReplaceEnabled)
 
                     Button(action: onReplaceAll) {
                         Text("Replace All")
@@ -72,6 +78,7 @@ struct FindReplacePanel: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .disabled(!isReplaceEnabled)
 
                     Spacer()
 
