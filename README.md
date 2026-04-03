@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A focused native macOS editor with workspace-level super-tabs, per-workspace file tabs, markdown preview, log viewing, and a clean fast workflow.
+  A focused native macOS editor with workspace-level super-tabs, per-workspace file tabs, split panes, markdown preview, log tailing, and a memory-efficient design.
 </p>
 
 <p align="center">
@@ -48,7 +48,10 @@ That makes it practical to keep one workspace for scratch notes, one for a writi
 - Case-sensitive and whole-word search toggles
 - Search result markers in the editor gutter
 - Markdown editor, split, and preview modes
-- Live log viewing with level highlighting and auto-scroll toggle
+- Live log tailing with level-based line highlighting and auto-scroll toggle
+- **Split pane editor** — horizontal or vertical, right-click any tab to open in a split
+- **Side-by-side diff** — highlight added/removed lines between two open files
+- Large-file safe mode — chunked read-only viewer keeps memory low on big files
 - App-wide Lunamode with System, Light, and Dark appearance modes
 - Word wrap toggle
 - Font panel integration
@@ -59,13 +62,33 @@ That makes it practical to keep one workspace for scratch notes, one for a writi
 
 LunaPad uses a two-layer navigation model:
 
-1. The top bar is the workspace bar.
-Each workspace behaves like a named editing zone.
+1. The top bar is the workspace bar. Each workspace behaves like a named editing zone.
 
-2. The second bar is the file tab bar for the active workspace.
-Each workspace owns its own `TabManager` and `FindReplaceManager`, so switching workspaces preserves context instead of flattening everything into one tab row.
+2. The second bar is the file tab bar for the active workspace. Each workspace owns its own `TabManager` and `FindReplaceManager`, so switching workspaces preserves context instead of flattening everything into one tab row.
 
 This makes the app feel closer to having multiple small editors open at once, but with less window clutter.
+
+## Split Panes
+
+Right-click any file tab to open it side by side with the current document — horizontal or vertical. A shared toolbar lets you:
+
+- toggle between horizontal and vertical layout
+- enable **Diff** mode, which highlights added and removed lines between the two panes using a Myers LCS diff
+- close the split
+
+Split state is saved per workspace and restored on relaunch. Splits on large files are blocked automatically to protect memory.
+
+## Large File Handling
+
+LunaPad uses tiered modes for large files:
+
+| File size         | Mode                                                                         |
+|-------------------|------------------------------------------------------------------------------|
+| Normal            | Full editable editor                                                         |
+| Large (>2M chars) | Protected mode — read-only by default, search on-demand                      |
+| Very large        | Chunked viewer — reads file in pages without loading it entirely into memory  |
+
+Log files bypass protected mode entirely and use the full editor with live reload.
 
 ## Download
 
@@ -117,39 +140,41 @@ The build script compiles the app, creates `LunaPad.app`, and refreshes the inst
 
 ## Keyboard Shortcuts
 
-- `Cmd-N` new file tab
-- `Cmd-Shift-N` new workspace
-- `Cmd-O` open file
-- `Cmd-S` save
-- `Cmd-Shift-S` save as
-- `Cmd-W` close file tab
-- `Cmd-Shift-W` close workspace
-- `Cmd-F` find
-- `Cmd-H` find and replace
-- `Cmd-T` font panel
-
-## Recent Highlights
-
-- Workspaces act like super-tabs, each with its own file tab row and editing state
-- Reopen recent files or entire recent workspaces from the File menu
-- Preview Markdown live in split or preview-only mode
-- Open `.log` files directly in LunaPad with live reload and level-based highlighting
-- Switch appearance instantly with Lunamode from the top bar or View menu
-- Keep search context visible with gutter markers across long documents
+| Shortcut | Action |
+|----------|--------|
+| `Cmd-N` | New file tab |
+| `Cmd-Shift-N` | New workspace |
+| `Cmd-O` | Open file |
+| `Cmd-S` | Save |
+| `Cmd-Shift-S` | Save As |
+| `Cmd-W` | Close file tab |
+| `Cmd-Shift-W` | Close workspace |
+| `Cmd-F` | Find |
+| `Cmd-H` | Find and replace |
+| `Cmd-T` | Font panel |
+| `Cmd-Ctrl-\` | Split horizontally |
+| `Cmd-Ctrl--` | Split vertically |
+| `Cmd-Ctrl-W` | Close split |
 
 ## Project Structure
 
 ```text
 Sources/
   MainView.swift            Main UI, workspace strip, file tabs, editor layout
-  WorkspaceManager.swift    Workspace-level state and switching
-                           plus session persistence and restore
+  WorkspaceManager.swift    Workspace and tab state, session persistence and restore
   FindReplaceManager.swift  Search and replace state
   NoteTextEditor.swift      AppKit-backed text editor bridge
-  MarkdownRenderer.swift    Markdown preview rendering
+  MarkdownRenderer.swift    WKWebView-based markdown preview
+  SplitPaneView.swift       Split pane layout and pane headers
+  DiffEngine.swift          Myers LCS line diff engine
+  LargeFileViewer.swift     Chunked viewer for very large files
+  MemoryBudget.swift        Memory thresholds and file loading helpers
+  SessionDocumentCache.swift Disk cache for large unsaved documents
+  LogFileWatcher.swift      kqueue-based file watcher for live log tailing
   LunaMode.swift            App-wide appearance controls and window theming
 build.sh                    Build, bundle, and install script
 bundle-app.sh               App bundle assembly
+benchmarks/                 Memory and performance benchmark fixtures and results
 ```
 
 ## Positioning
@@ -162,6 +187,7 @@ It is for users who want:
 - stronger structure than a single scratch pad
 - native macOS behavior
 - multiple parallel note contexts without window chaos
+- sensible handling of large files without grinding to a halt
 
 ## Roadmap
 
