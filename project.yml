@@ -25,11 +25,52 @@ targets:
       properties:
         CFBundleDisplayName: LunaPad
         CFBundleDocumentTypes:
-          - CFBundleTypeName: Plain Text Document
+          - CFBundleTypeName: Text and Source Files
             CFBundleTypeRole: Editor
-            LSHandlerRank: Alternate
+            LSHandlerRank: Default
+            CFBundleTypeExtensions:
+              - txt
+              - text
+              - md
+              - markdown
+              - log
+              - json
+              - xml
+              - yaml
+              - yml
+              - toml
+              - csv
+              - tsv
+              - sh
+              - zsh
+              - bash
+              - swift
+              - js
+              - ts
+              - jsx
+              - tsx
+              - py
+              - rb
+              - java
+              - c
+              - h
+              - m
+              - mm
+              - cpp
+              - hpp
+              - css
+              - scss
+              - html
+              - htm
+              - sql
+              - ini
+              - conf
+              - cfg
             LSItemContentTypes:
+              - public.text
               - public.plain-text
               - public.utf8-plain-text
+              - public.source-code
+              - net.daringfireball.markdown
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: true

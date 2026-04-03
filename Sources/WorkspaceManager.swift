@@ -1,6 +1,22 @@
 import Combine
 import Foundation
 
+enum MarkdownDisplayMode: String, CaseIterable, Identifiable {
+    case editor
+    case split
+    case preview
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .editor: return "Editor"
+        case .split: return "Split"
+        case .preview: return "Preview"
+        }
+    }
+}
+
 struct OpenDocument: Identifiable, Codable, Equatable {
     let id: UUID
     var fileURL: URL?
@@ -13,6 +29,27 @@ struct OpenDocument: Identifiable, Codable, Equatable {
         }
         return "Untitled"
     }
+
+    var isMarkdown: Bool {
+        guard let fileURL else { return false }
+        let extensionValue = fileURL.pathExtension.lowercased()
+        return ["md", "markdown", "mdown", "mkd"].contains(extensionValue)
+    }
+}
+
+struct RecentFileEntry: Codable, Equatable, Identifiable {
+    var url: URL
+
+    var id: String { url.absoluteString }
+
+    var displayName: String {
+        url.lastPathComponent
+    }
+}
+
+struct RecentItemsSnapshot: Codable {
+    var recentFiles: [RecentFileEntry]
+    var recentWorkspaces: [WorkspaceSnapshot]
 }
 
 struct TabManagerSnapshot: Codable {
@@ -20,7 +57,7 @@ struct TabManagerSnapshot: Codable {
     var selectedDocumentId: UUID?
 }
 
-struct WorkspaceSnapshot: Codable {
+struct WorkspaceSnapshot: Codable, Identifiable {
     var id: UUID
     var name: String
     var documents: [OpenDocument]
@@ -135,6 +172,7 @@ final class WorkspaceState: ObservableObject, Identifiable {
     let id: UUID
     @Published var name: String
     @Published var isRenaming: Bool
+    @Published var markdownDisplayMode: MarkdownDisplayMode = .editor
     let tabManager: TabManager
     let findReplaceManager: FindReplaceManager
 
@@ -186,10 +224,16 @@ final class WorkspaceState: ObservableObject, Identifiable {
 final class WorkspaceManager: ObservableObject {
     @Published var workspaces: [WorkspaceState] = []
     @Published var selectedWorkspaceId: UUID?
+    @Published var recentFiles: [RecentFileEntry] = []
+    @Published var recentWorkspaces: [WorkspaceSnapshot] = []
 
     private let sessionKey = "LunaPadWorkspaceSession"
+    private let recentItemsKey = "LunaPadRecentItems"
+    private let maxRecentFiles = 20
+    private let maxRecentWorkspaces = 10
 
     init() {
+        restoreRecentItems()
         if !restoreSession() {
             _ = newWorkspace(selectAndRename: false)
             persistSession()
@@ -249,6 +293,7 @@ final class WorkspaceManager: ObservableObject {
             return
         }
 
+        rememberRecentWorkspace(workspaces[index].snapshot())
         let wasSelected = selectedWorkspaceId == id
         workspaces.remove(at: index)
 
@@ -265,6 +310,44 @@ final class WorkspaceManager: ObservableObject {
         workspace.name = workspace.displayName
         workspace.isRenaming = false
         persistSession()
+    }
+
+    func noteRecentFile(_ url: URL) {
+        let standardizedURL = url.standardizedFileURL
+        recentFiles.removeAll { $0.url.standardizedFileURL == standardizedURL }
+        recentFiles.insert(RecentFileEntry(url: standardizedURL), at: 0)
+        if recentFiles.count > maxRecentFiles {
+            recentFiles = Array(recentFiles.prefix(maxRecentFiles))
+        }
+        persistRecentItems()
+    }
+
+    func reopenRecentWorkspace(id: UUID) {
+        guard let snapshot = recentWorkspaces.first(where: { $0.id == id }) else { return }
+        if let existingIndex = workspaces.firstIndex(where: { $0.id == id }) {
+            selectedWorkspaceId = workspaces[existingIndex].id
+        } else {
+            let workspace = makeWorkspace(
+                id: snapshot.id,
+                name: snapshot.name,
+                documents: snapshot.documents,
+                selectedDocumentId: snapshot.selectedDocumentId,
+                isRenaming: false
+            )
+            workspaces.append(workspace)
+            selectedWorkspaceId = workspace.id
+        }
+        persistSession()
+    }
+
+    func clearRecentFiles() {
+        recentFiles = []
+        persistRecentItems()
+    }
+
+    func clearRecentWorkspaces() {
+        recentWorkspaces = []
+        persistRecentItems()
     }
 
     private func nextWorkspaceName() -> String {
@@ -329,5 +412,32 @@ final class WorkspaceManager: ObservableObject {
         }
         selectedWorkspaceId = snapshot.selectedWorkspaceId ?? workspaces.first?.id
         return true
+    }
+
+    private func rememberRecentWorkspace(_ snapshot: WorkspaceSnapshot) {
+        recentWorkspaces.removeAll { $0.id == snapshot.id }
+        recentWorkspaces.insert(snapshot, at: 0)
+        if recentWorkspaces.count > maxRecentWorkspaces {
+            recentWorkspaces = Array(recentWorkspaces.prefix(maxRecentWorkspaces))
+        }
+        persistRecentItems()
+    }
+
+    private func persistRecentItems() {
+        let snapshot = RecentItemsSnapshot(
+            recentFiles: recentFiles,
+            recentWorkspaces: recentWorkspaces
+        )
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: recentItemsKey)
+    }
+
+    private func restoreRecentItems() {
+        guard let data = UserDefaults.standard.data(forKey: recentItemsKey),
+              let snapshot = try? JSONDecoder().decode(RecentItemsSnapshot.self, from: data) else {
+            return
+        }
+        recentFiles = snapshot.recentFiles
+        recentWorkspaces = snapshot.recentWorkspaces
     }
 }

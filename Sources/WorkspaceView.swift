@@ -9,6 +9,9 @@ struct WorkspaceView: View {
             .focusedSceneValue(\.workspaceManager, workspaceManager)
             .focusedSceneValue(\.tabManager, workspaceManager.currentTabManager)
             .focusedSceneValue(\.findReplaceManager, workspaceManager.currentFindReplaceManager)
+            .onAppear {
+                ExternalFileOpenCoordinator.shared.activate(workspaceManager)
+            }
     }
 }
 

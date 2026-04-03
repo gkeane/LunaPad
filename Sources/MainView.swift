@@ -22,8 +22,7 @@ struct MainView: View {
 
             if let workspace = workspaceManager.currentWorkspace {
                 WorkspaceContentView(
-                    tabManager: workspace.tabManager,
-                    findReplaceManager: workspace.findReplaceManager,
+                    workspace: workspace,
                     wordWrap: wordWrap,
                     font: editorFont
                 )
@@ -188,78 +187,168 @@ private struct WorkspaceTabButton: View {
 }
 
 private struct WorkspaceContentView: View {
-    @ObservedObject var tabManager: TabManager
-    @ObservedObject var findReplaceManager: FindReplaceManager
+    @ObservedObject var workspace: WorkspaceState
     let wordWrap: Bool
     let font: NSFont
     @State private var cursorPosition = CursorPosition()
     @State private var selectedRange: NSRange?
+
+    private var tabManager: TabManager { workspace.tabManager }
+    private var findReplaceManager: FindReplaceManager { workspace.findReplaceManager }
 
     var body: some View {
         VStack(spacing: 0) {
             FileTabStrip(tabManager: tabManager)
 
             if let doc = tabManager.currentDocument {
-                NoteTextEditor(
-                    text: Binding(
-                        get: { doc.content },
-                        set: {
-                            tabManager.updateContent(doc.id, $0)
-                            findReplaceManager.updateMatches(in: $0)
-                        }
-                    ),
-                    wordWrap: wordWrap,
-                    font: font,
-                    cursorPosition: $cursorPosition,
-                    selectedRange: $selectedRange
+                DocumentHeader(
+                    document: doc,
+                    markdownDisplayMode: $workspace.markdownDisplayMode
                 )
 
-                if findReplaceManager.isOpen {
-                    FindReplacePanel(
-                        manager: findReplaceManager,
-                        onSearchOptionsChanged: {
-                            findReplaceManager.updateMatches(in: doc.content)
-                            selectedRange = findReplaceManager.currentMatch
-                        },
-                        onFindNext: {
-                            selectedRange = findReplaceManager.findNext(in: doc.content)
-                        },
-                        onFindPrevious: {
-                            selectedRange = findReplaceManager.findPrevious(in: doc.content)
-                        },
-                        onReplace: {
-                            let replaced = findReplaceManager.replaceCurrent(in: doc.content)
-                            tabManager.updateContent(doc.id, replaced)
-                            findReplaceManager.updateMatches(in: replaced)
-                            selectedRange = findReplaceManager.currentMatch
-                        },
-                        onReplaceAll: {
-                            let replaced = findReplaceManager.replaceAll(in: doc.content)
-                            tabManager.updateContent(doc.id, replaced)
-                            findReplaceManager.updateMatches(in: replaced)
-                            selectedRange = findReplaceManager.currentMatch
-                        },
-                        onClose: { findReplaceManager.isOpen = false }
-                    )
-                }
+                documentBody(for: doc)
 
                 Divider()
                 StatusBarView(cursorPosition: cursorPosition)
             }
         }
         .onAppear {
-            if let content = tabManager.currentDocument?.content {
-                findReplaceManager.updateMatches(in: content)
-                selectedRange = findReplaceManager.currentMatch
-            }
+            refreshSearchState()
         }
         .onChange(of: tabManager.selectedDocumentId) { _ in
             selectedRange = nil
-            if let content = tabManager.currentDocument?.content {
-                findReplaceManager.updateMatches(in: content)
-                selectedRange = findReplaceManager.currentMatch
+            refreshSearchState()
+        }
+    }
+
+    @ViewBuilder
+    private func documentBody(for doc: OpenDocument) -> some View {
+        let displayMode = effectiveDisplayMode(for: doc)
+
+        switch displayMode {
+        case .editor:
+            editorPane(for: doc)
+        case .split:
+            HSplitView {
+                editorPane(for: doc)
+                    .frame(minWidth: 320)
+
+                MarkdownPreviewView(text: doc.content)
+                    .frame(minWidth: 260)
+            }
+        case .preview:
+            MarkdownPreviewView(text: doc.content)
+        }
+    }
+
+    private func effectiveDisplayMode(for doc: OpenDocument) -> MarkdownDisplayMode {
+        doc.isMarkdown ? workspace.markdownDisplayMode : .editor
+    }
+
+    @ViewBuilder
+    private func editorPane(for doc: OpenDocument) -> some View {
+        VStack(spacing: 0) {
+            NoteTextEditor(
+                text: Binding(
+                    get: { doc.content },
+                    set: {
+                        tabManager.updateContent(doc.id, $0)
+                        findReplaceManager.updateMatches(in: $0)
+                    }
+                ),
+                wordWrap: wordWrap,
+                font: font,
+                cursorPosition: $cursorPosition,
+                selectedRange: $selectedRange,
+                searchMatches: findReplaceManager.isOpen ? findReplaceManager.allMatches : [],
+                currentSearchMatch: findReplaceManager.isOpen ? findReplaceManager.currentMatch : nil
+            )
+
+            if findReplaceManager.isOpen {
+                FindReplacePanel(
+                    manager: findReplaceManager,
+                    onSearchOptionsChanged: {
+                        findReplaceManager.updateMatches(in: doc.content)
+                        selectedRange = findReplaceManager.currentMatch
+                    },
+                    onFindNext: {
+                        selectedRange = findReplaceManager.findNext(in: doc.content)
+                    },
+                    onFindPrevious: {
+                        selectedRange = findReplaceManager.findPrevious(in: doc.content)
+                    },
+                    onReplace: {
+                        let replaced = findReplaceManager.replaceCurrent(in: doc.content)
+                        tabManager.updateContent(doc.id, replaced)
+                        findReplaceManager.updateMatches(in: replaced)
+                        selectedRange = findReplaceManager.currentMatch
+                    },
+                    onReplaceAll: {
+                        let replaced = findReplaceManager.replaceAll(in: doc.content)
+                        tabManager.updateContent(doc.id, replaced)
+                        findReplaceManager.updateMatches(in: replaced)
+                        selectedRange = findReplaceManager.currentMatch
+                    },
+                    onClose: { findReplaceManager.isOpen = false }
+                )
             }
         }
+    }
+
+    private func refreshSearchState() {
+        if let content = tabManager.currentDocument?.content {
+            findReplaceManager.updateMatches(in: content)
+            selectedRange = findReplaceManager.currentMatch
+        }
+    }
+}
+
+private struct DocumentHeader: View {
+    let document: OpenDocument
+    @Binding var markdownDisplayMode: MarkdownDisplayMode
+
+    var body: some View {
+        HStack {
+            if document.isMarkdown {
+                Picker("Markdown View", selection: $markdownDisplayMode) {
+                    ForEach(MarkdownDisplayMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 230)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(nsColor: .underPageBackgroundColor))
+        .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+private struct MarkdownPreviewView: View {
+    let text: String
+
+    private var renderedText: AttributedString? {
+        try? AttributedString(markdown: text)
+    }
+
+    var body: some View {
+        ScrollView {
+            if let renderedText {
+                Text(renderedText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            } else {
+                Text(text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+        }
+        .textSelection(.enabled)
+        .background(Color(nsColor: .textBackgroundColor))
     }
 }
 

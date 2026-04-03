@@ -8,6 +8,7 @@ struct ContentView: View {
     @AppStorage("fontSize") private var fontSize: Double = 13
     @State private var cursorPosition = CursorPosition()
     @State private var selectedRange: NSRange?
+    @State private var searchMatches: [NSRange] = []
 
     private var editorFont: NSFont {
         NSFont(name: fontName, size: fontSize) ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -20,7 +21,9 @@ struct ContentView: View {
                 wordWrap: wordWrap,
                 font: editorFont,
                 cursorPosition: $cursorPosition,
-                selectedRange: $selectedRange
+                selectedRange: $selectedRange,
+                searchMatches: searchMatches,
+                currentSearchMatch: selectedRange
             )
             Divider()
             StatusBarView(cursorPosition: cursorPosition)

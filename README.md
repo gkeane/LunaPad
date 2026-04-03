@@ -1,7 +1,7 @@
 # LunaPad
 
 <p align="center">
-  <img src="assets/lunapad-logo.svg" alt="LunaPad logo" width="860">
+  <img src="assets/banner.png" alt="LunaPad banner" width="860">
 </p>
 
 <p align="center">

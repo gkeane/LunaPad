@@ -17,6 +17,10 @@ final class FindReplaceManager: ObservableObject {
         return matches[currentMatchIndex]
     }
 
+    var allMatches: [NSRange] {
+        matches
+    }
+
     func updateMatches(in text: String) {
         let previousLocation = currentMatch?.location
         matches = findAllMatches(in: text)
