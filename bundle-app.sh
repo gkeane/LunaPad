@@ -6,6 +6,8 @@ BINARY=".build/release/LunaPad"
 ICON_SOURCE="assets/image.png"
 ICONSET_DIR="$APP/Contents/Resources/LunaPad.iconset"
 ICON_FILE="$APP/Contents/Resources/LunaPad.icns"
+APP_VERSION="${APP_VERSION:-1.3.0}"
+APP_BUILD_NUMBER="${APP_BUILD_NUMBER:-3}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
@@ -27,7 +29,7 @@ cp "$ICON_SOURCE" "$ICONSET_DIR/icon_512x512@2x.png"
 iconutil -c icns "$ICONSET_DIR" -o "$ICON_FILE"
 rm -rf "$ICONSET_DIR"
 
-cat > "$APP/Contents/Info.plist" <<'EOF'
+cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -47,9 +49,9 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.3.0</string>
+    <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>3</string>
+    <string>${APP_BUILD_NUMBER}</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>CFBundleDocumentTypes</key>

@@ -101,6 +101,11 @@ Current release assets include:
 - a zipped `LunaPad.app` bundle for macOS
 - a `.sha256` checksum file
 
+Releases can also be produced by GitHub Actions:
+
+- push a tag like `v1.4.0`, or
+- run the `Release` workflow manually from the Actions tab with a version like `v1.4.0`
+
 Note: current releases are unsigned local builds. On first launch, macOS may require an extra confirmation step unless future builds are signed and notarized.
 
 ## Install
