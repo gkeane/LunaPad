@@ -9,6 +9,7 @@ struct NoteTextEditor: NSViewRepresentable {
     @Binding var selectedRange: NSRange?
     var searchMatches: [NSRange]
     var currentSearchMatch: NSRange?
+    var isLog: Bool = false
 
     func makeNSView(context: Context) -> EditorContainerView {
         let container = EditorContainerView()
@@ -25,6 +26,7 @@ struct NoteTextEditor: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = font
         textView.string = text
+        if isLog { applyLogHighlighting(textView: textView) }
 
         container.updateGutter(
             textLength: text.utf16.count,
@@ -46,6 +48,7 @@ struct NoteTextEditor: NSViewRepresentable {
             context.coordinator.ignoreChanges = false
             let safe = NSRange(location: min(saved.location, text.utf16.count), length: 0)
             textView.setSelectedRange(safe)
+            if isLog { applyLogHighlighting(textView: textView) }
         }
 
         if textView.font != font {
@@ -63,6 +66,33 @@ struct NoteTextEditor: NSViewRepresentable {
             currentSearchMatch: currentSearchMatch
         )
         applyWordWrap(textView: textView, scrollView: container.scrollView, wordWrap: wordWrap)
+    }
+
+    private func applyLogHighlighting(textView: NSTextView) {
+        guard let storage = textView.textStorage else { return }
+        let string = textView.string
+        let nsString = string as NSString
+        let fullRange = NSRange(location: 0, length: nsString.length)
+
+        storage.beginEditing()
+        nsString.enumerateSubstrings(in: fullRange, options: .byLines) { _, lineRange, _, _ in
+            guard lineRange.length > 0 else { return }
+            let upper = nsString.substring(with: lineRange).uppercased()
+            let color: NSColor
+            if upper.contains("ERROR") || upper.contains("FATAL") || upper.contains("CRITICAL") {
+                color = .systemRed
+            } else if upper.contains("WARN") {
+                color = .systemOrange
+            } else if upper.contains("DEBUG") {
+                color = .secondaryLabelColor
+            } else if upper.contains("TRACE") || upper.contains("VERBOSE") {
+                color = .tertiaryLabelColor
+            } else {
+                color = .textColor
+            }
+            storage.addAttribute(.foregroundColor, value: color, range: lineRange)
+        }
+        storage.endEditing()
     }
 
     private func applyWordWrap(textView: NSTextView, scrollView: NSScrollView, wordWrap: Bool) {
@@ -99,6 +129,9 @@ struct NoteTextEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !ignoreChanges, let textView = notification.object as? NSTextView else { return }
+            if parent.isLog {
+                parent.applyLogHighlighting(textView: textView)
+            }
             parent.text = textView.string
             updateCursor(textView)
         }
@@ -128,6 +161,25 @@ struct NoteTextEditor: NSViewRepresentable {
     }
 }
 
+// Custom NSTextView subclass that rejects file drops.
+// Default NSTextView accepts dragged files and inserts their paths as text,
+// which corrupts the document content.
+private final class LunaPadTextView: NSTextView {
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if sender.draggingPasteboard.availableType(from: [.fileURL]) != nil {
+            return []
+        }
+        return super.draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if sender.draggingPasteboard.availableType(from: [.fileURL]) != nil {
+            return false
+        }
+        return super.performDragOperation(sender)
+    }
+}
+
 final class EditorContainerView: NSView {
     let scrollView: NSScrollView
     let textView: NSTextView
@@ -135,12 +187,37 @@ final class EditorContainerView: NSView {
     private let gutterWidth: CGFloat = 12
 
     override init(frame frameRect: NSRect) {
-        let scrollView = NSTextView.scrollableTextView()
-        self.scrollView = scrollView
-        self.textView = scrollView.documentView as? NSTextView ?? NSTextView()
+        // Build scroll+text view manually so we can use LunaPadTextView.
+        // NSTextView.scrollableTextView() doesn't allow specifying a custom class.
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        )
+        textContainer.widthTracksTextView = true
+        layoutManager.addTextContainer(textContainer)
+
+        let tv = LunaPadTextView(frame: .zero, textContainer: textContainer)
+        tv.minSize = NSSize(width: 0, height: 0)
+        tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+
+        tv.textContainerInset = NSSize(width: 12, height: 8)
+
+        let sv = NSScrollView()
+        sv.hasVerticalScroller = true
+        sv.autohidesScrollers = true
+        sv.borderType = .noBorder
+        sv.documentView = tv
+
+        self.scrollView = sv
+        self.textView = tv
         super.init(frame: frameRect)
 
-        addSubview(scrollView)
+        addSubview(sv)
         addSubview(gutterView)
     }
 

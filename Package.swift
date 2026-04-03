@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "LunaPad",
-            path: "Sources"
+            path: "Sources",
+            linkerSettings: [.linkedFramework("WebKit")]
         )
     ]
 )

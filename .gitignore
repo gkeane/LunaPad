@@ -8,3 +8,5 @@ dist/
 .DS_Store
 *.dSYM
 xcuserdata/
+agents.md
+design.md

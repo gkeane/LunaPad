@@ -15,6 +15,14 @@ enum MarkdownDisplayMode: String, CaseIterable, Identifiable {
         case .preview: return "Preview"
         }
     }
+
+    var icon: String {
+        switch self {
+        case .editor: return "doc.plaintext"
+        case .split: return "rectangle.split.2x1"
+        case .preview: return "eye"
+        }
+    }
 }
 
 struct OpenDocument: Identifiable, Codable, Equatable {
@@ -34,6 +42,11 @@ struct OpenDocument: Identifiable, Codable, Equatable {
         guard let fileURL else { return false }
         let extensionValue = fileURL.pathExtension.lowercased()
         return ["md", "markdown", "mdown", "mkd"].contains(extensionValue)
+    }
+
+    var isLog: Bool {
+        guard let fileURL else { return false }
+        return fileURL.pathExtension.lowercased() == "log"
     }
 }
 

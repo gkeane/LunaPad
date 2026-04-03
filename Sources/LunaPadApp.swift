@@ -46,6 +46,14 @@ final class ExternalFileOpenCoordinator {
 }
 
 final class LunaPadAppDelegate: NSObject, NSApplicationDelegate {
+    // Modern method — called by Finder "Open With", drag-onto-dock-icon, etc.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        Task { @MainActor in
+            ExternalFileOpenCoordinator.shared.openFiles(urls)
+        }
+    }
+
+    // Legacy fallback
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
         let urls = filenames.map { URL(fileURLWithPath: $0) }
         Task { @MainActor in
@@ -194,6 +202,7 @@ struct LunaPadApp: App {
             }
 
             FormatCommands()
+            LunaModeCommands()
         }
     }
 

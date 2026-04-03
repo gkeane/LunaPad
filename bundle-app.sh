@@ -107,6 +107,7 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
                 <string>public.plain-text</string>
                 <string>public.utf8-plain-text</string>
                 <string>public.source-code</string>
+                <string>public.log</string>
                 <string>net.daringfireball.markdown</string>
             </array>
         </dict>

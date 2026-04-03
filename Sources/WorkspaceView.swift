@@ -2,10 +2,17 @@ import SwiftUI
 
 struct WorkspaceView: View {
     @StateObject private var workspaceManager = WorkspaceManager()
+    @AppStorage(LunaMode.storageKey) private var lunaModeRawValue = LunaMode.system.rawValue
+
+    private var lunaMode: LunaMode {
+        LunaMode(rawValue: lunaModeRawValue) ?? .system
+    }
 
     var body: some View {
         MainView(workspaceManager: workspaceManager)
             .navigationTitle(workspaceManager.currentWorkspace?.displayName ?? "Workspace")
+            .preferredColorScheme(lunaMode.colorScheme)
+            .background(WindowAppearanceApplier(mode: lunaMode))
             .focusedSceneValue(\.workspaceManager, workspaceManager)
             .focusedSceneValue(\.tabManager, workspaceManager.currentTabManager)
             .focusedSceneValue(\.findReplaceManager, workspaceManager.currentFindReplaceManager)

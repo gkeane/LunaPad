@@ -71,6 +71,7 @@ targets:
               - public.plain-text
               - public.utf8-plain-text
               - public.source-code
+              - public.log
               - net.daringfireball.markdown
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: true
